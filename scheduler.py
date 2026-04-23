@@ -28,27 +28,64 @@ class SchedulerManager:
     def _on_job_missed(self, event: JobEvent):
         print(f"[Scheduler] Job missed at {event.scheduled_run_time}")
     
+    def extract_meting_cookie(self) -> dict:
+        all_cookies = cookie_store.get_all_cookies_flat()
+        
+        uin = all_cookies.get('qqmusic_uin') or all_cookies.get('uin', '')
+        qqmusic_key = all_cookies.get('qqmusic_key', '')
+        refresh_token = all_cookies.get('psrf_qqrefresh_token', '')
+        access_token = all_cookies.get('psrf_qqaccess_token', '')
+        openid = all_cookies.get('psrf_qqopenid', '')
+        qm_keyst = all_cookies.get('qm_keyst', '')
+        guid = all_cookies.get('qqmusic_guid', '')
+        
+        if not uin or not qqmusic_key:
+            return None
+        
+        cookie_parts = [f"uin={uin}", f"qqmusic_key={qqmusic_key}"]
+        
+        if refresh_token:
+            cookie_parts.append(f"psrf_qqrefresh_token={refresh_token}")
+        if access_token:
+            cookie_parts.append(f"psrf_qqaccess_token={access_token}")
+        if openid:
+            cookie_parts.append(f"psrf_qqopenid={openid}")
+        if qm_keyst:
+            cookie_parts.append(f"qm_keyst={qm_keyst}")
+        if guid:
+            cookie_parts.append(f"qqmusic_guid={guid}")
+        
+        cookie_string = '; '.join(cookie_parts)
+        
+        return {
+            'uin': uin,
+            'qqmusic_key': qqmusic_key,
+            'cookie_string': cookie_string,
+            'refresh_token': refresh_token,
+            'has_refresh_token': bool(refresh_token)
+        }
+    
     async def send_cookies_to_target(self) -> dict:
         if not settings.TARGET_API_URL:
             print("[Scheduler] No target API URL configured, skipping send")
             return {"success": False, "error": "No target API URL configured"}
         
-        cookies = cookie_store.get_all_cookies_flat()
+        meting_cookie = self.extract_meting_cookie()
         
-        if not cookies:
-            print("[Scheduler] No cookies to send")
-            return {"success": False, "error": "No cookies available"}
+        if not meting_cookie:
+            print("[Scheduler] No valid QQ Music cookies found (missing uin or qqmusic_key)")
+            return {"success": False, "error": "No valid QQ Music cookies"}
         
         payload = {
-            "cookies": cookies,
-            "cookie_string": cookie_store.get_cookie_string(),
-            "timestamp": datetime.now().isoformat(),
-            "source": "qqmusic-cookie-manager"
+            "platform": "tencent",
+            "cookie": meting_cookie['cookie_string'],
+            "remark": f"Auto-synced from QQMusic-Cookie-Manager at {datetime.now().strftime('%Y-%m-%d %H:%M')}"
         }
         
         headers = {"Content-Type": "application/json"}
-        if settings.TARGET_API_TOKEN:
-            headers["Authorization"] = f"Bearer {settings.TARGET_API_TOKEN}"
+        if settings.TARGET_API_USERNAME and settings.TARGET_API_TOKEN:
+            headers["X-Auth-Username"] = settings.TARGET_API_USERNAME
+            headers["X-Auth-Token"] = settings.TARGET_API_TOKEN
         
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -62,10 +99,12 @@ class SchedulerManager:
                 self.last_execution = datetime.now()
                 self.execution_count += 1
                 
-                print(f"[Scheduler] Successfully sent {len(cookies)} cookies to {settings.TARGET_API_URL}")
+                print(f"[Scheduler] Successfully sent QQ Music cookie to {settings.TARGET_API_URL}")
+                print(f"[Scheduler] UIN: {meting_cookie['uin']}, Has refresh token: {meting_cookie['has_refresh_token']}")
                 return {
                     "success": True,
-                    "cookies_sent": len(cookies),
+                    "uin": meting_cookie['uin'],
+                    "has_refresh_token": meting_cookie['has_refresh_token'],
                     "response_status": response.status_code
                 }
                 

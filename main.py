@@ -146,16 +146,22 @@ Examples:
     manager = QQMusicCookieManager()
     
     if args.status:
-        cookies = cookie_store.get_cookies()
-        total = sum(len(c.get('cookies', {})) for c in cookies.values())
-        print(f"\nCookie Status:")
-        print(f"  Total hosts: {len(cookies)}")
-        print(f"  Total cookies: {total}")
-        for host, data in cookies.items():
-            print(f"\n  [{host}]")
-            print(f"    Captured: {data.get('captured_at')}")
-            print(f"    Updated: {data.get('updated_at')}")
-            print(f"    Cookies: {len(data.get('cookies', {}))}")
+        all_cookies = cookie_store.get_all_cookies_flat()
+        uin = all_cookies.get('qqmusic_uin') or all_cookies.get('uin', '')
+        qqmusic_key = all_cookies.get('qqmusic_key', '')
+        refresh_token = all_cookies.get('psrf_qqrefresh_token', '')
+        
+        print("\nQQ Music Cookie Status")
+        print("=" * 40)
+        
+        if uin and qqmusic_key:
+            print(f"  UIN: {uin}")
+            print(f"  Key: {qqmusic_key[:20]}...")
+            print(f"  Refresh Token: {'Yes' if refresh_token else 'No'}")
+            print(f"  Status: Valid")
+        else:
+            print("  Status: No valid cookie found")
+            print("  Please login QQ Music client first")
         return
     
     if args.send_now:

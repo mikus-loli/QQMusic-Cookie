@@ -1,24 +1,6 @@
 # QQ Music Cookie Manager
 
-QQ音乐客户端Cookie抓取和管理工具，支持定时发送到目标API。
-
-> 📖 **完整教程**：请查看 [TUTORIAL.md](./TUTORIAL.md) 获取详细的安装配置、使用指南和故障排除方案。
-
-## 项目结构
-
-```
-QQMusic-Cookie/
-├── main.py              # 主程序入口
-├── config.py            # 配置管理
-├── proxy_capture.py     # MITM代理抓包模块
-├── cookie_store.py      # Cookie存储管理
-├── api_server.py        # REST API服务
-├── scheduler.py         # 定时任务调度
-├── requirements.txt     # Python依赖
-├── .env.example         # 环境变量示例
-└── data/
-    └── cookies.json     # Cookie存储文件
-```
+QQ音乐客户端Cookie抓取工具，专为 [Meting-API](https://github.com/mikus-loli/Meting-API) 优化。
 
 ## 快速开始
 
@@ -37,148 +19,136 @@ cp .env.example .env
 编辑 `.env` 文件：
 
 ```ini
-# 目标API地址（接收Cookie的服务）
-TARGET_API_URL=http://your-server.com/api/cookies
-TARGET_API_TOKEN=your_token_here
+# API安全Token（保护Cookie API不被未授权访问）
+API_TOKEN=your_secure_token_here
 
-# 定时发送时间（每天8:00）
+# Meting-API 配置（定时同步Cookie）
+TARGET_API_URL=http://localhost:3000/admin/cookies
+TARGET_API_USERNAME=admin
+TARGET_API_TOKEN=your_meting_api_token
+
+# 定时发送时间
 SCHEDULE_HOUR=8
 SCHEDULE_MINUTE=0
 ```
 
-### 3. 安装MITM代理证书
-
-首次使用需要安装mitmproxy的CA证书：
+### 3. 安装MITM证书
 
 ```bash
 # 启动代理后访问
 http://mitm.it
 
-# 或直接安装证书文件
-# Windows: %USERPROFILE%\.mitmproxy\mitmproxy-ca-cert.p12
+# Windows安装证书到"受信任的根证书颁发机构"
 ```
 
-### 4. 配置QQ音乐客户端代理
+### 4. 配置QQ音乐代理
 
-**方法一：系统代理**
-- Windows设置 → 网络 → 代理 → 手动设置代理
-- 地址：`127.0.0.1`，端口：`8080`
+使用Proxifier强制QQ音乐走代理 `127.0.0.1:8080`
 
-**方法二：Proxifier等工具强制代理QQ音乐进程**
-
-## 运行模式
-
-### 完整服务模式（推荐）
-
-同时运行代理抓包、API服务和定时任务：
+### 5. 启动服务
 
 ```bash
 python main.py
 ```
 
-### 仅API服务
-
-只运行API服务（用于查询和管理已存储的Cookie）：
-
-```bash
-python main.py --api-only
-```
-
-### 仅代理抓包
-
-只运行代理抓包功能：
-
-```bash
-python main.py --proxy-only
-```
-
-### 手动发送Cookie
-
-立即发送Cookie到目标API：
-
-```bash
-python main.py --send-now
-```
-
-### 查看状态
-
-查看当前存储的Cookie状态：
-
-```bash
-python main.py --status
-```
-
 ## API接口
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/` | 服务状态 |
-| GET | `/api/cookies` | 获取所有Cookie |
-| GET | `/api/cookies/{host}` | 获取指定主机的Cookie |
-| GET | `/api/cookies/string` | 获取Cookie字符串格式 |
-| POST | `/api/cookies` | 手动添加Cookie |
-| PUT | `/api/cookies/{host}` | 更新指定主机的Cookie |
-| DELETE | `/api/cookies/{host}` | 删除指定主机的Cookie |
-| DELETE | `/api/cookies` | 清空所有Cookie |
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/` | 否 | 服务状态 |
+| GET | `/health` | 否 | 健康检查 |
+| GET | `/api/meting` | 是 | 获取完整Cookie |
+| GET | `/api/meting/simple` | 是 | 获取简化Cookie |
 
-### API使用示例
+### 认证方式
+
+所有 `/api/meting` 端点需要 Bearer Token 认证：
 
 ```bash
-# 获取所有Cookie
-curl http://localhost:5000/api/cookies
-
-# 获取Cookie字符串
-curl http://localhost:5000/api/cookies/string
-
-# 手动添加Cookie
-curl -X POST http://localhost:5000/api/cookies \
-  -H "Content-Type: application/json" \
-  -d '{"source_host": "y.qq.com", "cookies": {"uin": "123456", "skey": "abcdef"}}'
+curl -H "Authorization: Bearer your_token" http://localhost:5000/api/meting
 ```
 
-## 目标API数据格式
+### 响应示例
 
-定时任务发送到目标API的数据格式：
-
+**完整格式** `GET /api/meting`：
 ```json
 {
-  "cookies": {
-    "uin": "123456",
-    "skey": "abcdef",
-    "p_skey": "xyz123"
-  },
-  "cookie_string": "uin=123456; skey=abcdef; p_skey=xyz123",
-  "timestamp": "2024-01-15T08:00:00.000000",
-  "source": "qqmusic-cookie-manager"
+  "success": true,
+  "platform": "tencent",
+  "uin": "3166326944",
+  "qqmusic_key": "Q_H_L_63k3...",
+  "cookie": "uin=3166326944; qqmusic_key=Q_H_L_63k3...; psrf_qqrefresh_token=...",
+  "refresh_token": "7F6CEFEA...",
+  "has_refresh_token": true
 }
 ```
 
-## 注意事项
+**简化格式** `GET /api/meting/simple`：
+```json
+{
+  "success": true,
+  "cookie": "uin=3166326944; qqmusic_key=Q_H_L_63k3..."
+}
+```
 
-1. **证书信任**：必须信任mitmproxy的CA证书才能抓取HTTPS流量
-2. **代理配置**：QQ音乐客户端需要配置使用代理
-3. **登录状态**：确保QQ音乐客户端已登录，登录后会产生包含用户信息的Cookie
-4. **定时任务**：如果错过执行时间，会在1小时内补执行（misfire_grace_time=3600）
+## 定时同步到Meting-API
+
+### 配置说明
+
+| 变量 | 说明 |
+|------|------|
+| `TARGET_API_URL` | Meting-API Cookie接口地址，如 `http://localhost:3000/admin/cookies` |
+| `TARGET_API_USERNAME` | Meting-API 登录用户名 |
+| `TARGET_API_TOKEN` | Meting-API 登录Token |
+
+### 发送数据格式
+
+```json
+{
+  "platform": "tencent",
+  "cookie": "uin=3166326944; qqmusic_key=Q_H_L_63k3...; psrf_qqrefresh_token=...",
+  "remark": "Auto-synced from QQMusic-Cookie-Manager at 2024-01-15 08:00"
+}
+```
+
+### 认证方式
+
+使用 Meting-API 的认证头：
+```
+X-Auth-Username: admin
+X-Auth-Token: your_token
+```
+
+## 运行模式
+
+```bash
+# 完整服务（代理+API+定时任务）
+python main.py
+
+# 仅API服务
+python main.py --api-only
+
+# 仅代理抓包
+python main.py --proxy-only
+
+# 立即发送Cookie到Meting-API
+python main.py --send-now
+
+# 查看状态
+python main.py --status
+```
+
+## 安全建议
+
+1. **设置API_TOKEN**：防止Cookie被未授权访问
+2. **使用HTTPS**：生产环境建议配置反向代理
+3. **限制访问IP**：通过防火墙限制API访问来源
+4. **定期更换Token**：提高安全性
 
 ## 工作流程
 
 ```
-┌─────────────────┐
-│ QQ音乐客户端登录 │
-└────────┬────────┘
-         │ HTTPS请求
-         ▼
-┌─────────────────┐
-│  MITM代理抓包    │ ← 监听 127.0.0.1:8080
-└────────┬────────┘
-         │ 提取Cookie
-         ▼
-┌─────────────────┐
-│  Cookie存储      │ ← 保存到 data/cookies.json
-└────────┬────────┘
-         │ 每天8:00定时
-         ▼
-┌─────────────────┐
-│  发送到目标API   │ ← POST到 TARGET_API_URL
-└─────────────────┘
+QQ音乐客户端 → MITM代理(8080) → Cookie存储 → API服务(5000)
+                                    ↓
+                            定时同步到Meting-API
 ```

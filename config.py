@@ -12,11 +12,13 @@ class Settings(BaseSettings):
     
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 5000
+    API_TOKEN: Optional[str] = None
     
     SCHEDULE_HOUR: int = 8
     SCHEDULE_MINUTE: int = 0
     
     TARGET_API_URL: Optional[str] = None
+    TARGET_API_USERNAME: Optional[str] = None
     TARGET_API_TOKEN: Optional[str] = None
     
     DATA_DIR: Path = Path("data")
@@ -28,6 +30,10 @@ class Settings(BaseSettings):
         "u.y.qq.com",
         "m.y.qq.com",
         "api.y.qq.com",
+        "szu6.y.qq.com",
+        "szu.y.qq.com",
+        "shu6.y.qq.com",
+        "stat.y.qq.com",
     ]
 
     class Config:
