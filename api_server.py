@@ -143,3 +143,10 @@ async def create_cookies(request: CookieCreateRequest):
 async def clear_all_cookies():
     cookie_store.clear_all()
     return {"success": True, "message": "All cookies cleared"}
+
+
+@app.post("/api/send", dependencies=[Depends(verify_token)])
+async def send_cookies_now():
+    from scheduler import scheduler_manager
+    result = await scheduler_manager.send_cookies_to_target()
+    return result

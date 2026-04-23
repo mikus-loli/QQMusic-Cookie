@@ -526,7 +526,7 @@ function loadSettingsPage() {
 async function sendNow() {
     try {
         showToast('正在发送Cookie...', 'info');
-        const result = await schedulerManager.send_cookies_to_target();
+        const result = await apiRequest('/api/send', { method: 'POST' });
         if (result.success) {
             showToast('Cookie发送成功', 'success');
         } else {

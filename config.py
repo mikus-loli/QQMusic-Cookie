@@ -18,7 +18,6 @@ class Settings(BaseSettings):
     SCHEDULE_MINUTE: int = 0
     
     TARGET_API_URL: Optional[str] = None
-    TARGET_API_USERNAME: Optional[str] = None
     TARGET_API_TOKEN: Optional[str] = None
     
     DATA_DIR: Path = Path("data")

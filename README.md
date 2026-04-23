@@ -30,17 +30,23 @@ cp .env.example .env
 # API安全Token（保护Cookie API不被未授权访问）
 API_TOKEN=your_secure_token_here
 
-# Meting-API 配置（定时同步Cookie）
+# Meting-API 配置
 TARGET_API_URL=http://localhost:3000/admin/cookies
-TARGET_API_USERNAME=admin
-TARGET_API_TOKEN=your_meting_api_token
+TARGET_API_TOKEN=mapi_xxxxxxxx...
 
 # 定时发送时间
 SCHEDULE_HOUR=8
 SCHEDULE_MINUTE=0
 ```
 
-### 3. 安装MITM证书
+### 3. 获取 Meting-API Token
+
+1. 登录 Meting-API 管理后台
+2. 进入 API Token 管理
+3. 创建新 Token（以 `mapi_` 开头）
+4. 将 Token 填入 `.env` 的 `TARGET_API_TOKEN`
+
+### 4. 安装MITM证书
 
 ```bash
 # 启动代理后访问
@@ -49,11 +55,11 @@ http://mitm.it
 # Windows安装证书到"受信任的根证书颁发机构"
 ```
 
-### 4. 配置QQ音乐代理
+### 5. 配置QQ音乐代理
 
 使用Proxifier强制QQ音乐走代理 `127.0.0.1:8080`
 
-### 5. 启动服务
+### 6. 启动服务
 
 ```bash
 python main.py
@@ -72,10 +78,6 @@ python main.py
 | 定时任务 | 配置定时同步、手动触发 |
 | 系统设置 | API配置、快速操作 |
 
-### 登录
-
-使用 `.env` 中配置的 `API_TOKEN` 登录管理后台。
-
 ## API接口
 
 | 方法 | 路径 | 认证 | 说明 |
@@ -85,6 +87,7 @@ python main.py
 | GET | `/api/meting` | 是 | 获取完整Cookie |
 | GET | `/api/meting/simple` | 是 | 获取简化Cookie |
 | POST | `/api/cookies` | 是 | 添加Cookie |
+| POST | `/api/send` | 是 | 发送Cookie到Meting-API |
 | DELETE | `/api/cookies` | 是 | 清空所有Cookie |
 
 ### 认证方式
@@ -116,9 +119,8 @@ curl -H "Authorization: Bearer your_token" http://localhost:5000/api/meting
 
 | 变量 | 说明 |
 |------|------|
-| `TARGET_API_URL` | Meting-API Cookie接口地址，如 `http://localhost:3000/admin/cookies` |
-| `TARGET_API_USERNAME` | Meting-API 登录用户名 |
-| `TARGET_API_TOKEN` | Meting-API 登录Token |
+| `TARGET_API_URL` | Meting-API Cookie接口地址 |
+| `TARGET_API_TOKEN` | Meting-API Token（以 `mapi_` 开头） |
 
 ### 发送数据格式
 
@@ -126,8 +128,16 @@ curl -H "Authorization: Bearer your_token" http://localhost:5000/api/meting
 {
   "platform": "tencent",
   "cookie": "uin=3166326944; qqmusic_key=Q_H_L_63k3...; psrf_qqrefresh_token=...",
-  "remark": "Auto-synced from QQMusic-Cookie-Manager at 2024-01-15 08:00"
+  "note": "Auto-synced from QQMusic-Cookie-Manager",
+  "isActive": true
 }
+```
+
+### 认证方式
+
+使用 Bearer Token 认证：
+```
+Authorization: Bearer mapi_xxxxxxxx...
 ```
 
 ## 运行模式
@@ -149,28 +159,16 @@ python main.py --send-now
 python main.py --status
 ```
 
-## 项目结构
+## Cookie 格式说明
 
+**QQ音乐最简格式**：
 ```
-QQMusic-Cookie/
-├── main.py              # 主程序入口
-├── config.py            # 配置管理
-├── api_server.py        # REST API服务
-├── proxy_capture.py     # MITM代理抓包
-├── cookie_store.py      # Cookie存储
-├── scheduler.py         # 定时任务
-├── static/              # 前端静态文件
-│   ├── index.html       # 管理后台
-│   ├── css/
-│   │   ├── style.css
-│   │   └── responsive.css
-│   └── js/
-│       └── auth.js
-├── data/                # 数据目录
-│   └── cookies.json     # Cookie存储
-├── requirements.txt     # 完整依赖
-├── requirements-lite.txt # 轻量依赖
-└── .env.example         # 配置示例
+uin=你的QQ号; qqmusic_key=Q_H_L_开头的key
+```
+
+**完整格式（支持自动续期）**：
+```
+uin=你的QQ号; qqmusic_key=Q_H_L_xxx; qm_keyst=Q_H_L_xxx; psrf_qqrefresh_token=刷新token; psrf_qqaccess_token=访问token; psrf_qqopenid=openid
 ```
 
 ## 安全建议

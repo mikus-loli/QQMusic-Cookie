@@ -44,14 +44,14 @@ class SchedulerManager:
         
         cookie_parts = [f"uin={uin}", f"qqmusic_key={qqmusic_key}"]
         
+        if qm_keyst:
+            cookie_parts.append(f"qm_keyst={qm_keyst}")
         if refresh_token:
             cookie_parts.append(f"psrf_qqrefresh_token={refresh_token}")
         if access_token:
             cookie_parts.append(f"psrf_qqaccess_token={access_token}")
         if openid:
             cookie_parts.append(f"psrf_qqopenid={openid}")
-        if qm_keyst:
-            cookie_parts.append(f"qm_keyst={qm_keyst}")
         if guid:
             cookie_parts.append(f"qqmusic_guid={guid}")
         
@@ -70,6 +70,10 @@ class SchedulerManager:
             print("[Scheduler] No target API URL configured, skipping send")
             return {"success": False, "error": "No target API URL configured"}
         
+        if not settings.TARGET_API_TOKEN:
+            print("[Scheduler] No target API token configured, skipping send")
+            return {"success": False, "error": "No target API token configured"}
+        
         meting_cookie = self.extract_meting_cookie()
         
         if not meting_cookie:
@@ -79,13 +83,14 @@ class SchedulerManager:
         payload = {
             "platform": "tencent",
             "cookie": meting_cookie['cookie_string'],
-            "remark": f"Auto-synced from QQMusic-Cookie-Manager at {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            "note": f"Auto-synced from QQMusic-Cookie-Manager",
+            "isActive": True
         }
         
-        headers = {"Content-Type": "application/json"}
-        if settings.TARGET_API_USERNAME and settings.TARGET_API_TOKEN:
-            headers["X-Auth-Username"] = settings.TARGET_API_USERNAME
-            headers["X-Auth-Token"] = settings.TARGET_API_TOKEN
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {settings.TARGET_API_TOKEN}"
+        }
         
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -96,22 +101,39 @@ class SchedulerManager:
                 )
                 response.raise_for_status()
                 
+                result = response.json()
+                
                 self.last_execution = datetime.now()
                 self.execution_count += 1
                 
                 print(f"[Scheduler] Successfully sent QQ Music cookie to {settings.TARGET_API_URL}")
                 print(f"[Scheduler] UIN: {meting_cookie['uin']}, Has refresh token: {meting_cookie['has_refresh_token']}")
+                
+                if result.get('success') and result.get('data'):
+                    data = result['data']
+                    print(f"[Scheduler] Cookie ID: {data.get('id', 'N/A')}")
+                    if data.get('userInfo'):
+                        user_info = data['userInfo']
+                        print(f"[Scheduler] User: {user_info.get('nickname', 'N/A')}, VIP: {user_info.get('isVip', False)}")
+                
                 return {
                     "success": True,
                     "uin": meting_cookie['uin'],
                     "has_refresh_token": meting_cookie['has_refresh_token'],
-                    "response_status": response.status_code
+                    "response_status": response.status_code,
+                    "data": result.get('data')
                 }
                 
         except httpx.HTTPStatusError as e:
             self.error_count += 1
-            print(f"[Scheduler] HTTP error: {e.response.status_code} - {e.response.text}")
-            return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.text}"}
+            error_detail = e.response.text
+            try:
+                error_json = e.response.json()
+                error_detail = error_json.get('message', error_detail)
+            except:
+                pass
+            print(f"[Scheduler] HTTP error: {e.response.status_code} - {error_detail}")
+            return {"success": False, "error": f"HTTP {e.response.status_code}: {error_detail}"}
             
         except httpx.RequestError as e:
             self.error_count += 1
