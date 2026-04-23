@@ -2,6 +2,9 @@
 chcp 65001 >nul
 title QQ Music Cookie Manager - Run Once
 
+REM 切换到脚本所在目录
+cd /d "%~dp0"
+
 echo ============================================
 echo QQ Music Cookie Manager - Run Once
 echo ============================================

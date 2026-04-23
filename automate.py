@@ -114,22 +114,28 @@ class AutomationManager:
         self.proxy_process: Optional[subprocess.Popen] = None
         self.running = False
         self.cycle_count = 0
+        self.script_dir = Path(__file__).parent.absolute()
     
     def start_proxy(self) -> bool:
         print("[Proxy] Starting MITM proxy...")
         try:
+            main_script = self.script_dir / "main.py"
+            
             self.proxy_process = subprocess.Popen(
-                [sys.executable, "main.py", "--proxy-only"],
+                [sys.executable, str(main_script), "--proxy-only"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                text=True
+                text=True,
+                cwd=str(self.script_dir)
             )
-            time.sleep(3)
+            time.sleep(5)
             if self.proxy_process.poll() is None:
                 print(f"[Proxy] Proxy started (PID: {self.proxy_process.pid})")
                 return True
             else:
-                print("[Proxy] Failed to start proxy")
+                output = self.proxy_process.stdout.read() if self.proxy_process.stdout else ""
+                print(f"[Proxy] Failed to start proxy")
+                print(f"[Proxy] Output: {output}")
                 return False
         except Exception as e:
             print(f"[Proxy] Error starting proxy: {e}")
