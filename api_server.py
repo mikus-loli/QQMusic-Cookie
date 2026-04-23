@@ -1,7 +1,10 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from typing import Optional
 from datetime import datetime
+from pathlib import Path
 from cookie_store import cookie_store
 from config import settings
 
@@ -16,6 +19,11 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None
 )
+
+
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -40,6 +48,15 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/admin")
+@app.get("/admin/{path:path}")
+async def admin_panel(path: str = ""):
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    return {"error": "Admin panel not found"}
 
 
 @app.get("/api/meting", dependencies=[Depends(verify_token)])
@@ -102,3 +119,27 @@ async def get_meting_cookie_simple():
         "success": True,
         "cookie": f"uin={uin}; qqmusic_key={qqmusic_key}"
     }
+
+
+from pydantic import BaseModel
+from typing import Dict
+
+
+class CookieCreateRequest(BaseModel):
+    source_host: str
+    cookies: Dict[str, str]
+
+
+@app.post("/api/cookies", dependencies=[Depends(verify_token)])
+async def create_cookies(request: CookieCreateRequest):
+    cookie_store.save_cookies(request.source_host, request.cookies)
+    return {
+        "success": True,
+        "message": f"Saved {len(request.cookies)} cookies for {request.source_host}"
+    }
+
+
+@app.delete("/api/cookies", dependencies=[Depends(verify_token)])
+async def clear_all_cookies():
+    cookie_store.clear_all()
+    return {"success": True, "message": "All cookies cleared"}
