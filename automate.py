@@ -4,6 +4,7 @@ import time
 import subprocess
 import asyncio
 import signal
+import threading
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional
@@ -13,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from config import settings
 from cookie_store import cookie_store
 from scheduler import scheduler_manager
+from proxy_capture import ProxyManager
 
 
 class QQMusicController:
@@ -111,7 +113,8 @@ class QQMusicController:
 class AutomationManager:
     def __init__(self):
         self.qqmusic = QQMusicController()
-        self.proxy_process: Optional[subprocess.Popen] = None
+        self.proxy_manager: Optional[ProxyManager] = None
+        self.proxy_thread: Optional[threading.Thread] = None
         self.running = False
         self.cycle_count = 0
         self.script_dir = Path(__file__).parent.absolute()
@@ -119,39 +122,29 @@ class AutomationManager:
     def start_proxy(self) -> bool:
         print("[Proxy] Starting MITM proxy...")
         try:
-            main_script = self.script_dir / "main.py"
+            self.proxy_manager = ProxyManager(on_cookie_captured=self._on_cookie_captured)
             
-            self.proxy_process = subprocess.Popen(
-                [sys.executable, str(main_script), "--proxy-only"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                cwd=str(self.script_dir)
+            self.proxy_thread = threading.Thread(
+                target=self.proxy_manager.run_proxy_sync,
+                daemon=True
             )
+            self.proxy_thread.start()
+            
             time.sleep(5)
-            if self.proxy_process.poll() is None:
-                print(f"[Proxy] Proxy started (PID: {self.proxy_process.pid})")
-                return True
-            else:
-                output = self.proxy_process.stdout.read() if self.proxy_process.stdout else ""
-                print(f"[Proxy] Failed to start proxy")
-                print(f"[Proxy] Output: {output}")
-                return False
+            print(f"[Proxy] Proxy started on {settings.PROXY_HOST}:{settings.PROXY_PORT}")
+            return True
         except Exception as e:
             print(f"[Proxy] Error starting proxy: {e}")
             return False
     
+    def _on_cookie_captured(self, capture_info: dict):
+        host = capture_info.get("host", "unknown")
+        cookies = capture_info.get("cookies", {})
+        if cookies:
+            cookie_store.save_cookies(host, cookies)
+    
     def stop_proxy(self) -> bool:
-        if self.proxy_process:
-            try:
-                self.proxy_process.terminate()
-                self.proxy_process.wait(timeout=10)
-                print("[Proxy] Proxy stopped")
-                return True
-            except Exception as e:
-                print(f"[Proxy] Error stopping proxy: {e}")
-                self.proxy_process.kill()
-                return True
+        print("[Proxy] Proxy will stop when program exits")
         return True
     
     def clear_cookies(self) -> bool:
