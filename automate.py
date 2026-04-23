@@ -217,32 +217,38 @@ class AutomationManager:
         }
         
         try:
-            print("\n[Step 1/6] Starting proxy...")
+            print("\n[Step 1/7] Starting proxy...")
             if not self.start_proxy():
                 result["error"] = "Failed to start proxy"
                 return result
             
-            print("\n[Step 2/6] Starting QQ Music...")
+            print("\n[Step 2/7] Waiting for proxy to stabilize (60s)...")
+            for i in range(60, 0, -1):
+                print(f"\r[Wait] {i} seconds remaining...", end="", flush=True)
+                time.sleep(1)
+            print("\r[Wait] Proxy ready!                    ")
+            
+            print("\n[Step 3/7] Starting QQ Music...")
             if not self.qqmusic.start():
                 result["error"] = "Failed to start QQ Music"
                 self.stop_proxy()
                 return result
             
-            print("\n[Step 3/6] Waiting for cookies...")
+            print("\n[Step 4/7] Waiting for cookies...")
             time.sleep(10)
             
             if not self.wait_for_cookies(timeout=300):
                 result["error"] = "No valid cookies captured"
             else:
-                print("\n[Step 4/6] Sending cookies...")
+                print("\n[Step 5/7] Sending cookies...")
                 send_result = await self.send_cookies()
                 result["success"] = send_result.get('success', False)
                 result["send_result"] = send_result
             
-            print("\n[Step 5/6] Stopping QQ Music...")
+            print("\n[Step 6/7] Stopping QQ Music...")
             self.qqmusic.stop()
             
-            print("\n[Step 6/6] Stopping proxy and cleaning up...")
+            print("\n[Step 7/7] Stopping proxy and cleaning up...")
             self.stop_proxy()
             self.clear_cookies()
             
