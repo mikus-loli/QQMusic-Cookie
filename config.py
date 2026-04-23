@@ -1,0 +1,38 @@
+from pydantic_settings import BaseSettings
+from typing import Optional
+from pathlib import Path
+
+
+class Settings(BaseSettings):
+    APP_NAME: str = "QQMusic Cookie Manager"
+    DEBUG: bool = False
+    
+    PROXY_HOST: str = "127.0.0.1"
+    PROXY_PORT: int = 8080
+    
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 5000
+    
+    SCHEDULE_HOUR: int = 8
+    SCHEDULE_MINUTE: int = 0
+    
+    TARGET_API_URL: Optional[str] = None
+    TARGET_API_TOKEN: Optional[str] = None
+    
+    DATA_DIR: Path = Path("data")
+    COOKIE_FILE: Path = Path("data/cookies.json")
+    
+    QQ_MUSIC_DOMAINS: list = [
+        "y.qq.com",
+        "c.y.qq.com", 
+        "u.y.qq.com",
+        "m.y.qq.com",
+        "api.y.qq.com",
+    ]
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+
+settings = Settings()
