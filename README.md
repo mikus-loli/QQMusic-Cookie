@@ -9,6 +9,7 @@ QQ音乐客户端Cookie抓取工具，专为 [Meting-API](https://github.com/mik
 - 🔐 **安全认证**：Token认证保护API访问
 - ⏰ **定时同步**：自动定时发送Cookie到Meting-API
 - 🔄 **自动续期**：支持refresh_token自动续期
+- 🤖 **全自动化**：自动启动QQ音乐、抓取、发送、关闭的完整流程
 
 ## 快速开始
 
@@ -27,26 +28,18 @@ cp .env.example .env
 编辑 `.env` 文件：
 
 ```ini
-# API安全Token（保护Cookie API不被未授权访问）
+# API安全Token
 API_TOKEN=your_secure_token_here
 
 # Meting-API 配置
 TARGET_API_URL=http://localhost:3000/admin/cookies
 TARGET_API_TOKEN=mapi_xxxxxxxx...
 
-# 定时发送时间
-SCHEDULE_HOUR=8
-SCHEDULE_MINUTE=0
+# QQ音乐路径（可选，自动检测）
+QQMUSIC_PATH=C:\Program Files (x86)\Tencent\QQMusic\QQMusic.exe
 ```
 
-### 3. 获取 Meting-API Token
-
-1. 登录 Meting-API 管理后台
-2. 进入 API Token 管理
-3. 创建新 Token（以 `mapi_` 开头）
-4. 将 Token 填入 `.env` 的 `TARGET_API_TOKEN`
-
-### 4. 安装MITM证书
+### 3. 安装MITM证书
 
 ```bash
 # 启动代理后访问
@@ -55,14 +48,67 @@ http://mitm.it
 # Windows安装证书到"受信任的根证书颁发机构"
 ```
 
-### 5. 配置QQ音乐代理
+## 运行模式
 
-使用Proxifier强制QQ音乐走代理 `127.0.0.1:8080`
+### 自动化模式（推荐）
 
-### 6. 启动服务
+全自动循环：启动QQ音乐 → 抓取Cookie → 发送 → 关闭 → 等待 → 循环
 
 ```bash
+# 双击运行
+run_automate.bat
+
+# 或命令行
+python automate.py --interval 24
+```
+
+**参数说明**：
+- `--interval 24`：每24小时执行一次
+- `--once`：仅执行一次
+
+### 手动模式
+
+```bash
+# 完整服务（代理+API+定时任务）
 python main.py
+
+# 仅API服务
+python main.py --api-only
+
+# 仅代理抓包
+python main.py --proxy-only
+
+# 立即发送Cookie
+python main.py --send-now
+
+# 查看状态
+python main.py --status
+```
+
+## 自动化流程
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    自动化流程 (每24小时)                      │
+└─────────────────────────────────────────────────────────────┘
+
+  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+  │  启动代理     │────▶│  启动QQ音乐   │────▶│  等待Cookie  │
+  └──────────────┘     └──────────────┘     └───────┬──────┘
+                                                     │
+        ┌────────────────────────────────────────────┘
+        ▼
+  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+  │  发送Cookie   │────▶│  关闭QQ音乐   │────▶│  清理文件    │
+  └──────────────┘     └──────────────┘     └───────┬──────┘
+                                                     │
+        ┌────────────────────────────────────────────┘
+        ▼
+  ┌──────────────┐
+  │  等待24小时   │
+  └───────┬──────┘
+          │
+          └──────────────────────▶ 循环
 ```
 
 ## 管理后台
@@ -98,21 +144,6 @@ python main.py
 curl -H "Authorization: Bearer your_token" http://localhost:5000/api/meting
 ```
 
-### 响应示例
-
-**完整格式** `GET /api/meting`：
-```json
-{
-  "success": true,
-  "platform": "tencent",
-  "uin": "3166326944",
-  "qqmusic_key": "Q_H_L_63k3...",
-  "cookie": "uin=3166326944; qqmusic_key=Q_H_L_63k3...; psrf_qqrefresh_token=...",
-  "refresh_token": "7F6CEFEA...",
-  "has_refresh_token": true
-}
-```
-
 ## 定时同步到Meting-API
 
 ### 配置说明
@@ -121,6 +152,7 @@ curl -H "Authorization: Bearer your_token" http://localhost:5000/api/meting
 |------|------|
 | `TARGET_API_URL` | Meting-API Cookie接口地址 |
 | `TARGET_API_TOKEN` | Meting-API Token（以 `mapi_` 开头） |
+| `QQMUSIC_PATH` | QQ音乐可执行文件路径（可选） |
 
 ### 发送数据格式
 
@@ -133,32 +165,6 @@ curl -H "Authorization: Bearer your_token" http://localhost:5000/api/meting
 }
 ```
 
-### 认证方式
-
-使用 Bearer Token 认证：
-```
-Authorization: Bearer mapi_xxxxxxxx...
-```
-
-## 运行模式
-
-```bash
-# 完整服务（代理+API+定时任务）
-python main.py
-
-# 仅API服务
-python main.py --api-only
-
-# 仅代理抓包
-python main.py --proxy-only
-
-# 立即发送Cookie到Meting-API
-python main.py --send-now
-
-# 查看状态
-python main.py --status
-```
-
 ## Cookie 格式说明
 
 **QQ音乐最简格式**：
@@ -168,7 +174,26 @@ uin=你的QQ号; qqmusic_key=Q_H_L_开头的key
 
 **完整格式（支持自动续期）**：
 ```
-uin=你的QQ号; qqmusic_key=Q_H_L_xxx; qm_keyst=Q_H_L_xxx; psrf_qqrefresh_token=刷新token; psrf_qqaccess_token=访问token; psrf_qqopenid=openid
+uin=你的QQ号; qqmusic_key=Q_H_L_xxx; qm_keyst=Q_H_L_xxx; psrf_qqrefresh_token=刷新token
+```
+
+## 项目结构
+
+```
+QQMusic-Cookie/
+├── automate.py          # 自动化脚本
+├── main.py              # 主程序入口
+├── config.py            # 配置管理
+├── api_server.py        # REST API服务
+├── proxy_capture.py     # MITM代理抓包
+├── cookie_store.py      # Cookie存储
+├── scheduler.py         # 定时任务
+├── run_automate.bat     # 自动化启动脚本
+├── run_once.bat         # 单次执行脚本
+├── static/              # 前端静态文件
+├── data/                # 数据目录
+├── requirements.txt     # 完整依赖
+└── .env.example         # 配置示例
 ```
 
 ## 安全建议
@@ -178,10 +203,13 @@ uin=你的QQ号; qqmusic_key=Q_H_L_xxx; qm_keyst=Q_H_L_xxx; psrf_qqrefresh_token
 3. **限制访问IP**：通过防火墙限制API访问来源
 4. **定期更换Token**：提高安全性
 
-## 工作流程
+## 常见问题
 
-```
-QQ音乐客户端 → MITM代理(8080) → Cookie存储 → API服务(5000)
-                                    ↓
-                            定时同步到Meting-API
-```
+### Q: 自动化模式无法启动QQ音乐？
+A: 检查 `.env` 中的 `QQMUSIC_PATH` 是否正确，或确保QQ音乐安装在默认路径。
+
+### Q: Cookie抓取失败？
+A: 确保已安装MITM证书，并配置QQ音乐走代理。
+
+### Q: 发送失败？
+A: 检查 `TARGET_API_URL` 和 `TARGET_API_TOKEN` 配置是否正确。

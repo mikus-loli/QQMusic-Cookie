@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     TARGET_API_URL: Optional[str] = None
     TARGET_API_TOKEN: Optional[str] = None
     
+    QQMUSIC_PATH: Optional[str] = None
+    
     DATA_DIR: Path = Path("data")
     COOKIE_FILE: Path = Path("data/cookies.json")
     
