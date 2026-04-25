@@ -4,7 +4,6 @@ import time
 import subprocess
 import asyncio
 import signal
-import threading
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional
@@ -14,7 +13,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 from config import settings
 from cookie_store import cookie_store
 from scheduler import scheduler_manager
-from proxy_capture import ProxyManager
 
 
 class QQMusicController:
@@ -113,38 +111,66 @@ class QQMusicController:
 class AutomationManager:
     def __init__(self):
         self.qqmusic = QQMusicController()
-        self.proxy_manager: Optional[ProxyManager] = None
-        self.proxy_thread: Optional[threading.Thread] = None
+        self.proxy_process: Optional[subprocess.Popen] = None
         self.running = False
         self.cycle_count = 0
         self.script_dir = Path(__file__).parent.absolute()
     
+    def get_python_executable(self) -> str:
+        venv_paths = [
+            self.script_dir / "venv" / "Scripts" / "python.exe",
+            self.script_dir / ".venv" / "Scripts" / "python.exe",
+        ]
+        
+        for venv_python in venv_paths:
+            if venv_python.exists():
+                return str(venv_python)
+        
+        return sys.executable
+    
     def start_proxy(self) -> bool:
-        print("[Proxy] Starting MITM proxy...")
+        print("[Proxy] Starting MITM proxy as subprocess...")
         try:
-            self.proxy_manager = ProxyManager(on_cookie_captured=self._on_cookie_captured)
+            python_exe = self.get_python_executable()
+            proxy_script = self.script_dir / "proxy_capture.py"
             
-            self.proxy_thread = threading.Thread(
-                target=self.proxy_manager.run_proxy_sync,
-                daemon=True
+            self.proxy_process = subprocess.Popen(
+                [python_exe, str(proxy_script)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                cwd=str(self.script_dir)
             )
-            self.proxy_thread.start()
             
             time.sleep(5)
+            
+            if self.proxy_process.poll() is not None:
+                print(f"[Proxy] Proxy process exited unexpectedly with code: {self.proxy_process.returncode}")
+                return False
+            
             print(f"[Proxy] Proxy started on {settings.PROXY_HOST}:{settings.PROXY_PORT}")
+            print(f"[Proxy] Proxy PID: {self.proxy_process.pid}")
             return True
         except Exception as e:
             print(f"[Proxy] Error starting proxy: {e}")
             return False
     
-    def _on_cookie_captured(self, capture_info: dict):
-        host = capture_info.get("host", "unknown")
-        cookies = capture_info.get("cookies", {})
-        if cookies:
-            cookie_store.save_cookies(host, cookies)
-    
     def stop_proxy(self) -> bool:
-        print("[Proxy] Proxy will stop when program exits")
+        if self.proxy_process:
+            try:
+                print("[Proxy] Stopping proxy process...")
+                self.proxy_process.terminate()
+                try:
+                    self.proxy_process.wait(timeout=10)
+                    print("[Proxy] Proxy terminated gracefully")
+                except subprocess.TimeoutExpired:
+                    self.proxy_process.kill()
+                    print("[Proxy] Proxy killed forcefully")
+            except Exception as e:
+                print(f"[Proxy] Error stopping proxy: {e}")
+            finally:
+                self.proxy_process = None
         return True
     
     def clear_cookies(self) -> bool:
