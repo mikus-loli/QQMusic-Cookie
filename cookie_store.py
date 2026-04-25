@@ -116,6 +116,11 @@ class CookieStore:
             self._cookies.clear()
             self._save_to_file()
     
+    def reload(self) -> None:
+        with self._data_lock:
+            self._cookies.clear()
+            self._load_from_file()
+    
     def update_cookies(self, source_host: str, cookies: Dict[str, str]) -> bool:
         with self._data_lock:
             if source_host in self._cookies:

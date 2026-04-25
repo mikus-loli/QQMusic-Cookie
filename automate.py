@@ -214,6 +214,7 @@ class AutomationManager:
         last_cookie_count = 0
         
         while time.time() - start_time < timeout:
+            cookie_store.reload()
             all_cookies = cookie_store.get_all_cookies_flat()
             cookie_count = len(all_cookies)
             
