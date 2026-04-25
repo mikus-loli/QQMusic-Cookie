@@ -136,10 +136,8 @@ class AutomationManager:
             
             self.proxy_process = subprocess.Popen(
                 [python_exe, str(proxy_script)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 cwd=str(self.script_dir)
             )
             
