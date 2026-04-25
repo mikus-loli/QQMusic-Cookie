@@ -133,11 +133,18 @@ class AutomationManager:
         try:
             python_exe = self.get_python_executable()
             proxy_script = self.script_dir / "proxy_capture.py"
+            log_file = self.script_dir / "logs" / "proxy.log"
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            log_handle = open(log_file, 'a', encoding='utf-8')
+            log_handle.write(f"\n{'='*50}\n")
+            log_handle.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting proxy\n")
+            log_handle.flush()
             
             self.proxy_process = subprocess.Popen(
                 [python_exe, str(proxy_script)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=log_handle,
                 cwd=str(self.script_dir)
             )
             
@@ -149,6 +156,7 @@ class AutomationManager:
             
             print(f"[Proxy] Proxy started on {settings.PROXY_HOST}:{settings.PROXY_PORT}")
             print(f"[Proxy] Proxy PID: {self.proxy_process.pid}")
+            print(f"[Proxy] Log file: {log_file}")
             return True
         except Exception as e:
             print(f"[Proxy] Error starting proxy: {e}")
